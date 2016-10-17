@@ -3,6 +3,7 @@ FROM openjdk:8-jdk
 RUN apt-get update && apt-get install -y git curl && rm -rf /var/lib/apt/lists/*
 
 ENV JENKINS_HOME /var/jenkins_home
+ENV JENKINS_REF /usr/share/jenkins/ref
 ENV JENKINS_SLAVE_AGENT_PORT 50000
 
 ARG user=jenkins
@@ -20,10 +21,10 @@ RUN groupadd -g ${gid} ${group} \
 # can be persisted and survive image upgrades
 VOLUME /var/jenkins_home
 
-# `/usr/share/jenkins/ref/` contains all reference configuration we want 
+# `${JENKINS_REF}` contains all reference configuration we want 
 # to set on a fresh new installation. Use it to bundle additional plugins 
 # or config file with your custom jenkins Docker image.
-RUN mkdir -p /usr/share/jenkins/ref/init.groovy.d
+RUN mkdir -p ${JENKINS_REF}/init.groovy.d
 
 ENV TINI_VERSION 0.9.0
 ENV TINI_SHA fa23d1e20732501c3bb8eeeca423c89ac80ed452
@@ -32,7 +33,7 @@ ENV TINI_SHA fa23d1e20732501c3bb8eeeca423c89ac80ed452
 RUN curl -fsSL https://github.com/krallin/tini/releases/download/v${TINI_VERSION}/tini-static -o /bin/tini && chmod +x /bin/tini \
   && echo "$TINI_SHA  /bin/tini" | sha1sum -c -
 
-COPY init.groovy /usr/share/jenkins/ref/init.groovy.d/tcp-slave-agent-port.groovy
+COPY init.groovy ${JENKINS_REF}/init.groovy.d/tcp-slave-agent-port.groovy
 
 # jenkins version being bundled in this docker image
 ARG JENKINS_VERSION
@@ -50,7 +51,7 @@ RUN curl -fsSL ${JENKINS_URL} -o /usr/share/jenkins/jenkins.war \
   && echo "${JENKINS_SHA}  /usr/share/jenkins/jenkins.war" | sha1sum -c -
 
 ENV JENKINS_UC https://updates.jenkins.io
-RUN chown -R ${user} "$JENKINS_HOME" /usr/share/jenkins/ref
+RUN chown -R ${user} "$JENKINS_HOME" ${JENKINS_REF}
 
 # for main web interface:
 EXPOSE 8080
@@ -66,6 +67,6 @@ COPY jenkins-support /usr/local/bin/jenkins-support
 COPY jenkins.sh /usr/local/bin/jenkins.sh
 ENTRYPOINT ["/bin/tini", "--", "/usr/local/bin/jenkins.sh"]
 
-# from a derived Dockerfile, can use `RUN plugins.sh active.txt` to setup /usr/share/jenkins/ref/plugins from a support bundle
+# from a derived Dockerfile, can use `RUN install-plugins.sh <active.txt` to setup ${JENKINS_REF}/plugins from a support bundle
 COPY plugins.sh /usr/local/bin/plugins.sh
 COPY install-plugins.sh /usr/local/bin/install-plugins.sh
